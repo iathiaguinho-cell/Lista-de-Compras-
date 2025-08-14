@@ -1,0 +1,14 @@
+﻿{
+  "name": "Minhas Compras",
+  "short_name": "Compras",
+  "description": "Aplicativo de lista de compras com calculadora integrada e sincronia na nuvem.",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#dee2e6",
+  "theme_color": "#007aff",
+  "icons": [
+    { "src": "icon-192x192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
+
