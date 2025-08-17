@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
@@ -18,7 +18,7 @@
             --cor-texto-principal: #212529; --cor-texto-secundario: #6c757d;
             --cor-borda: #ced4da; --sombra-painel: 0 4px 12px rgba(0, 0, 0, 0.08);
             --raio-borda: 16px; --font-principal: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            --font-mono: 'Courier New', monospace; /* Fonte problemática removida */
+            --font-mono: 'Courier New', monospace;
         }
         html, body { height: 100%; overflow: hidden; font-family: var(--font-principal); background-color: var(--cor-fundo); color: var(--cor-texto-principal); }
         #install-banner{display:none;position:fixed;bottom:10px;left:10px;right:10px;background-color:var(--cor-container);color:var(--cor-texto-principal);padding:15px;border-radius:var(--raio-borda);box-shadow:0 8px 24px rgba(0,0,0,0.2);z-index:5000;align-items:center;justify-content:space-between;animation:slideUp 0.5s ease-out}
@@ -87,6 +87,7 @@
             <button id="install-btn">Instalar</button>
         </div>
     </div>
+
     <div class="app-container">
         <header class="header-section">
             <div class="top-bar">
@@ -103,6 +104,7 @@
                 </button>
             </div>
         </header>
+
         <main class="main-content">
             <div class="tabs">
                 <button class="tab-btn active" data-tab="faltando">A Comprar</button>
@@ -113,6 +115,7 @@
             <div id="lista-comprados-container" class="list-container"><ul id="lista-comprados" class="item-list"></ul></div>
             <div id="lista-adiados-container" class="list-container"><ul id="lista-adiados" class="item-list"></ul></div>
         </main>
+
         <footer class="calculator-footer">
             <button id="toggle-calc-btn" title="Mostrar/Ocultar Calculadora"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg></button>
             <div class="calculator-body">
@@ -129,6 +132,7 @@
             </div>
         </footer>
     </div>
+
     <div id="report-modal" class="modal-overlay">
         <div class="modal-content">
             <div id="report-paper"></div>
@@ -145,15 +149,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // ||||||||||||||| INSIRA SUA CHAVE DO UNIVERSO (FIREBASE) AQUI |||||||||||||||||||||||
     // ===================================================================================
     const firebaseConfig = {
-    apiKey: "AIzaSyCUs2j0p1VRnPO4vKXTSreVI_qmGzfs7xE",
-    authDomain: "compraseidvalencio.firebaseapp.com",
-    databaseURL: "https://compraseidvalencio-default-rtdb.firebaseio.com",
-    projectId: "compraseidvalencio",
-    storageBucket: "compraseidvalencio.firebasestorage.app",
-    messagingSenderId: "1090744409027",
-    appId: "1:1090744409027:web:ad0fefdc9d08ad8ac4bb76"
-  };
-
+        apiKey: "AIzaSyCUs2j0p1VRnPO4vKXTSreVI_qmGzfs7xE",
+        authDomain: "compraseidvalencio.firebaseapp.com",
+        databaseURL: "https://compraseidvalencio-default-rtdb.firebaseio.com",
+        projectId: "compraseidvalencio",
+        storageBucket: "compraseidvalencio.firebasestorage.app",
+        messagingSenderId: "1090744409027",
+        appId: "1:1090744409027:web:ad0fefdc9d08ad8ac4bb76"
+    };
     // ===================================================================================
     // |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
     // ===================================================================================
@@ -164,7 +167,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const auth = firebase.auth();
     const listId = window.location.pathname.replace(/[^a-zA-Z0-9]/g, '') || 'home';
     const listRef = database.ref('shopping_lists/' + listId);
-
+    
     auth.onAuthStateChanged(user => {
         if (!user) {
             auth.signInAnonymously().catch(err => console.error("Auth Error:", err));
@@ -173,7 +176,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Estado da Aplicação ---
     const state = {
-        itens: [], // Agora vêm da nuvem
+        itens: [],
         activeItemId: null,
         calcDisplay: '0',
         currentTab: 'faltando',
@@ -317,7 +320,19 @@ document.addEventListener('DOMContentLoaded', () => {
         },
         toggleCalculator: () => { state.ui.isCalculatorCollapsed = !state.ui.isCalculatorCollapsed; store.saveUI(); render.calculator(); },
         openReportModal: () => {
-            const comprados = state.itens.filter(i => i.status === 'comprado'); if (comprados.length === 0) { alert('Nenhum item foi comprado ainda.'); return; }
+            // BLOQUEIO: Verifica se ainda há itens na lista "A comprar"
+            const faltando = state.itens.filter(i => i.status === 'faltando');
+            if (faltando.length > 0) {
+                alert('Ainda há itens na lista "A comprar"! Finalize todos os itens antes de gerar o relatório.');
+                return;
+            }
+
+            const comprados = state.itens.filter(i => i.status === 'comprado'); 
+            if (comprados.length === 0) { 
+                alert('Nenhum item foi comprado ainda.'); 
+                return; 
+            }
+
             const total = comprados.reduce((acc, i) => acc + (i.preco * i.quantidade), 0);
             let reportText = `*** CUPOM FISCAL ***\n\nDATA: ${new Date().toLocaleString('pt-BR')}\n--------------------------------\nITEM      QTD    PREÇO    TOTAL\n--------------------------------\n`;
             comprados.forEach(i => { reportText += `${i.nome.substring(0, 8).padEnd(8)} ${String(i.quantidade).padStart(4)} x ${i.preco.toFixed(2).padStart(8)} = ${(i.quantidade * i.preco).toFixed(2).padStart(8)}\n`; });
@@ -326,16 +341,41 @@ document.addEventListener('DOMContentLoaded', () => {
             ui.reportModal.classList.add('visible');
         },
         finalizeAndReset: () => {
-            const adiados = state.itens.filter(i => i.status === 'adiado');
-            listRef.set(null).then(() => {
-                if (adiados.length > 0) {
-                    const newItems = {};
-                    adiados.forEach(item => { const { id, ...data } = item; newItems[id] = { ...data, status: 'faltando' }; });
-                    listRef.set(newItems);
-                }
+            // SALVAR RELATÓRIO: Pega os dados para salvar no Firebase
+            const comprados = state.itens.filter(i => i.status === 'comprado');
+            if (comprados.length === 0) return;
+
+            const total = comprados.reduce((acc, i) => acc + (i.preco * i.quantidade), 0);
+            const reportText = ui.reportPaper.textContent;
+            
+            const reportData = {
+                content: reportText,
+                total: total,
+                createdAt: firebase.database.ServerValue.TIMESTAMP
+            };
+
+            const reportsRef = database.ref('purchase_reports/' + listId);
+            reportsRef.push(reportData).then(() => {
+                // SÓ EXECUTA O RESTANTE DEPOIS DE SALVAR O RELATÓRIO
+                const adiados = state.itens.filter(i => i.status === 'adiado');
+                listRef.set(null).then(() => {
+                    if (adiados.length > 0) {
+                        const newItems = {};
+                        adiados.forEach(item => { 
+                            const { id, ...data } = item; 
+                            newItems[id] = { ...data, status: 'faltando' }; 
+                        });
+                        listRef.set(newItems);
+                    }
+                });
+
+                ui.reportModal.classList.remove('visible');
+                interactions.switchTab('faltando');
+
+            }).catch(error => {
+                console.error("Erro ao salvar o relatório no Firebase:", error);
+                alert("Não foi possível salvar o relatório. Verifique sua conexão e tente novamente.");
             });
-            ui.reportModal.classList.remove('visible');
-            interactions.switchTab('faltando');
         },
         downloadReport: () => { const blob = new Blob([ui.reportPaper.textContent], {type: 'text/plain'}); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'relatorio_compras.txt'; a.click(); },
         printReport: () => { const win = window.open('', '_blank'); win.document.write(`<html><head><title>Relatório de Compra</title></head><body><pre>${ui.reportPaper.textContent}</pre></body></html>`); win.document.close(); win.print(); }
