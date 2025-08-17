@@ -21,6 +21,8 @@
             --font-mono: 'Courier New', monospace;
         }
         html, body { height: 100%; overflow: hidden; font-family: var(--font-principal); background-color: var(--cor-fundo); color: var(--cor-texto-principal); }
+        #update-banner { display: none; background-color: var(--cor-aviso); color: white; padding: 10px; text-align: center; position: fixed; top: 0; width: 100%; z-index: 6000; }
+        #update-banner button { border: 1px solid white; background: transparent; color: white; padding: 5px 10px; border-radius: 5px; margin-left: 15px; cursor: pointer; }
         #install-banner{display:none;position:fixed;bottom:10px;left:10px;right:10px;background-color:var(--cor-container);color:var(--cor-texto-principal);padding:15px;border-radius:var(--raio-borda);box-shadow:0 8px 24px rgba(0,0,0,0.2);z-index:5000;align-items:center;justify-content:space-between;animation:slideUp 0.5s ease-out}
         #install-banner p{margin:0;font-size:0.9rem;line-height:1.3}
         #install-banner-buttons{display:flex;gap:10px}
@@ -81,6 +83,11 @@
     </style>
 </head>
 <body>
+    <div id="update-banner">
+        Nova versão disponível!
+        <button id="update-btn">Atualizar</button>
+    </div>
+
     <div id="install-banner">
         <p>Leve sua lista de compras para a tela inicial!</p>
         <div id="install-banner-buttons">
@@ -348,7 +355,7 @@ document.addEventListener('DOMContentLoaded', () => {
         addItem: (e) => { e.preventDefault(); const nome = ui.input.value.trim(); if (nome) { const newItemId = Date.now(); listRef.child(newItemId).set({ id: newItemId, nome: nome, emoji: getEmojiForItem(nome), status: 'faltando', quantidade: 1, preco: 0 }); ui.input.value = ''; ui.input.focus(); } },
         deleteItem: (id) => { if (confirm('Tem certeza que deseja remover este item?')) { if (state.activeItemId === id) state.activeItemId = null; listRef.child(id).remove(); } },
         updateItem: (id, updates) => listRef.child(id).update(updates),
-        handleItemClick: (id, status) => { if (status === 'faltando') interactions.selectItem(id); if (status === 'comprado') interactions.updateItem(id, { status: 'faltando', preco: 0 }); if (status === 'adiado') interactions.updateItem(id, { status: 'faltando' }); },
+        handleItemClick: (id, status) => { if (status === 'faltando') interactions.selectItem(id); if (status === 'comprado') interactions.updateItem(id, { status: 'faltando', preco: 0, quantidade: 1 }); if (status === 'adiado') interactions.updateItem(id, { status: 'faltando' }); },
         selectItem: (id) => { state.activeItemId = (state.activeItemId === id) ? null : id; state.calcDisplay = '0'; render.all(); },
         handleTabClick: (tabName) => {
             if (tabName === 'adiados' && state.activeItemId) {
@@ -385,7 +392,10 @@ document.addEventListener('DOMContentLoaded', () => {
         },
         finalizeAndReset: () => {
             const comprados = state.itens.filter(i => i.status === 'comprado');
-            if (comprados.length === 0) return;
+            if (comprados.length === 0) {
+                ui.reportModal.classList.remove('visible');
+                return;
+            }
 
             const total = comprados.reduce((acc, i) => acc + (i.preco * i.quantidade), 0);
             const reportData = {
@@ -394,22 +404,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 createdAt: new Date().toISOString()
             };
 
-            reportsRef.push(reportData).catch(error => {
-                console.error("Erro ao salvar o relatório no Firebase:", error);
-                alert("Não foi possível salvar o relatório. Verifique sua conexão e tente novamente.");
-            });
-
-            const adiados = state.itens.filter(i => i.status === 'adiado');
-            listRef.set(null).then(() => {
+            reportsRef.push(reportData).then(() => {
+                const adiados = state.itens.filter(i => i.status === 'adiado');
+                const newItems = {};
                 if (adiados.length > 0) {
-                    const newItems = {};
-                    adiados.forEach(item => { 
-                        const newItemId = Date.now() + Math.random(); // Garante ID único
-                        const { id, ...data } = item; 
-                        newItems[newItemId] = { ...data, status: 'faltando' }; 
+                    adiados.forEach(item => {
+                        const oldId = item.id;
+                        let newItemData = { ...item };
+                        delete newItemData.id;
+                        newItemData.status = 'faltando';
+                        newItemData.preco = 0;
+                        newItemData.quantidade = 1;
+                        newItems[oldId] = newItemData;
                     });
-                    listRef.set(newItems);
                 }
+                listRef.set(newItems);
+            }).catch(error => {
+                console.error("Erro ao finalizar a compra:", error);
+                alert("Ocorreu um erro. Verifique sua conexão e tente novamente.");
             });
 
             ui.reportModal.classList.remove('visible');
@@ -429,7 +441,40 @@ document.addEventListener('DOMContentLoaded', () => {
     interactions.init();
 });
 
-// --- Lógica do PWA ---
+// --- Lógica do PWA e Atualizador ---
+let newWorker;
+
+function showUpdateBar() {
+    const banner = document.getElementById('update-banner');
+    banner.style.display = 'block';
+    document.getElementById('update-btn').addEventListener('click', () => {
+        newWorker.postMessage({ action: 'skipWaiting' });
+    });
+}
+
+if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+        navigator.serviceWorker.register("./service-worker.js").then(reg => {
+            reg.addEventListener('updatefound', () => {
+                newWorker = reg.installing;
+                newWorker.addEventListener('statechange', () => {
+                    if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                        showUpdateBar();
+                    }
+                });
+            });
+        });
+
+        let refreshing;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+            if (refreshing) return;
+            window.location.reload();
+            refreshing = true;
+        });
+    });
+}
+
+// --- Lógica de Instalação (deferred prompt) ---
 let deferredPrompt;
 window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
@@ -453,14 +498,6 @@ window.addEventListener('appinstalled', () => {
     document.getElementById('install-banner').style.display = 'none';
     deferredPrompt = null;
 });
-
-if ("serviceWorker" in navigator) {
-    window.addEventListener("load", () => {
-        navigator.serviceWorker.register("./service-worker.js")
-            .then(reg => console.log("Service Worker: Registrado com Sucesso"))
-            .catch(err => console.log("Service Worker: Falha no Registro:", err));
-    });
-}
 </script>
 </body>
 </html>
