@@ -47,15 +47,16 @@
         .list-container{display:none}
         .list-container.active{display:block}
         .item-list{list-style:none;padding:0}
-        .item-row{display:flex;align-items:center;padding:10px;background:var(--cor-container);border-radius:12px;margin-bottom:10px;box-shadow:var(--sombra-painel);transition:all 0.3s ease;cursor:pointer}
+        .item-row, .report-item{display:flex;align-items:center;padding:10px;background:var(--cor-container);border-radius:12px;margin-bottom:10px;box-shadow:var(--sombra-painel);transition:all 0.3s ease;cursor:pointer}
+        .report-item:hover{transform:scale(1.02); box-shadow:0 0 0 2px var(--cor-primaria);}
         .item-row.status-comprado{opacity:0.7}
         .item-row.status-comprado .item-name{text-decoration:line-through}
         .item-row.status-adiado{border-left:5px solid var(--cor-aviso);opacity:0.8}
         .item-row.active{box-shadow:0 0 0 3px var(--cor-primaria),0 4px 12px rgba(0,122,255,0.3);transform:scale(1.02)}
         .item-emoji{font-size:1.5rem;margin-right:10px;user-select:none}
-        .item-details{display:flex;flex-direction:column;flex-grow:1;pointer-events:none}
-        .item-name{font-size:1.2rem;font-weight:500}
-        .item-price-info{font-size:0.9rem;color:var(--cor-texto-secundario)}
+        .item-details, .report-details{display:flex;flex-direction:column;flex-grow:1;pointer-events:none}
+        .item-name, .report-date{font-size:1.2rem;font-weight:500}
+        .item-price-info, .report-total{font-size:0.9rem;color:var(--cor-texto-secundario)}
         .delete-btn{background:none;border:none;cursor:pointer;padding:5px;margin-left:10px}
         .calculator-footer{flex-shrink:0;background-color:#212529;padding:0 15px 15px 15px;border-top:2px solid #495057;position:relative}
         #toggle-calc-btn{position:absolute;top:-25px;left:50%;transform:translateX(-50%);width:50px;height:25px;background-color:#212529;border:2px solid #495057;border-bottom:none;border-radius:10px 10px 0 0;color:#adb5bd;cursor:pointer}
@@ -74,9 +75,9 @@
         .keypad .clear{background-color:var(--cor-perigo)}
         .modal-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;opacity:0;visibility:hidden;transition:opacity 0.3s;z-index:2000}
         .modal-overlay.visible{opacity:1;visibility:visible}
-        .modal-content{background:#f0f1f6;padding:20px;border-radius:var(--raio-borda);width:90%;max-width:400px}
-        #report-paper{background:white;padding:20px;font-family:'Courier New',Courier,monospace;white-space:pre-wrap;max-height:60vh;overflow-y:auto;border:1px dashed #ccc;margin-bottom:20px}
-        .modal-actions{display:flex;gap:10px;justify-content:space-between}
+        .modal-content{background:#f0f1f6;padding:20px;border-radius:var(--raio-borda);width:90%;max-width:400px; display: flex; flex-direction: column;}
+        #report-paper, #report-view-content{background:white;padding:20px;font-family:'Courier New',Courier,monospace;white-space:pre-wrap;max-height:60vh;overflow-y:auto;border:1px dashed #ccc;margin-bottom:20px}
+        .modal-actions{display:flex;gap:10px;justify-content:flex-end}
     </style>
 </head>
 <body>
@@ -110,10 +111,12 @@
                 <button class="tab-btn active" data-tab="faltando">A Comprar</button>
                 <button class="tab-btn" data-tab="comprados">Comprados</button>
                 <button class="tab-btn" data-tab="adiados">Adiados</button>
+                <button class="tab-btn" data-tab="relatorios">Relatórios</button>
             </div>
             <div id="lista-faltando-container" class="list-container active"><ul id="lista-faltando" class="item-list"></ul></div>
             <div id="lista-comprados-container" class="list-container"><ul id="lista-comprados" class="item-list"></ul></div>
             <div id="lista-adiados-container" class="list-container"><ul id="lista-adiados" class="item-list"></ul></div>
+            <div id="lista-relatorios-container" class="list-container"><ul id="lista-relatorios" class="item-list"></ul></div>
         </main>
 
         <footer class="calculator-footer">
@@ -133,20 +136,33 @@
         </footer>
     </div>
 
+    <!-- Modal para finalizar compra -->
     <div id="report-modal" class="modal-overlay">
         <div class="modal-content">
             <div id="report-paper"></div>
-            <div class="modal-actions">
+            <div class="modal-actions" style="justify-content: space-between;">
                 <div><button id="download-report-btn">Baixar</button><button id="print-report-btn">Imprimir</button></div>
                 <div><button id="close-modal-btn">Fechar</button><button id="finalize-purchase-btn" class="btn btn-success" style="padding: 8px 12px; font-size: 1rem;">Finalizar Compra</button></div>
             </div>
         </div>
     </div>
 
+    <!-- Modal para visualizar relatório salvo -->
+    <div id="report-view-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h3 style="margin-top: 0;">Relatório de Compra</h3>
+            <div id="report-view-content"></div>
+            <div class="modal-actions">
+                <button id="close-view-modal-btn">Fechar</button>
+            </div>
+        </div>
+    </div>
+
+
 <script>
 document.addEventListener('DOMContentLoaded', () => {
     // ===================================================================================
-    // ||||||||||||||| INSIRA SUA CHAVE DO UNIVERSO (FIREBASE) AQUI |||||||||||||||||||||||
+    // CONFIGURAÇÃO DO FIREBASE
     // ===================================================================================
     const firebaseConfig = {
         apiKey: "AIzaSyCUs2j0p1VRnPO4vKXTSreVI_qmGzfs7xE",
@@ -158,8 +174,6 @@ document.addEventListener('DOMContentLoaded', () => {
         appId: "1:1090744409027:web:ad0fefdc9d08ad8ac4bb76"
     };
     // ===================================================================================
-    // |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
-    // ===================================================================================
 
     // --- Inicialização e Autenticação ---
     firebase.initializeApp(firebaseConfig);
@@ -167,6 +181,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const auth = firebase.auth();
     const listId = window.location.pathname.replace(/[^a-zA-Z0-9]/g, '') || 'home';
     const listRef = database.ref('shopping_lists/' + listId);
+    const reportsRef = database.ref('purchase_reports/' + listId);
     
     auth.onAuthStateChanged(user => {
         if (!user) {
@@ -177,6 +192,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Estado da Aplicação ---
     const state = {
         itens: [],
+        reports: [],
         activeItemId: null,
         calcDisplay: '0',
         currentTab: 'faltando',
@@ -204,6 +220,9 @@ document.addEventListener('DOMContentLoaded', () => {
         printReportBtn: document.getElementById('print-report-btn'),
         downloadReportBtn: document.getElementById('download-report-btn'),
         finalizePurchaseBtn: document.getElementById('finalize-purchase-btn'),
+        reportViewModal: document.getElementById('report-view-modal'),
+        reportViewContent: document.getElementById('report-view-content'),
+        closeViewModalBtn: document.getElementById('close-view-modal-btn'),
     };
 
     // --- Utilitários ---
@@ -211,11 +230,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const getEmojiForItem = (nome) => { const nomeLower = nome.toLowerCase(); for (const key in emojiMap) if (nomeLower.includes(key)) return emojiMap[key]; return emojiMap.default; };
     const store = { saveUI: () => localStorage.setItem('uiState-' + listId, JSON.stringify(state.ui)) };
 
-    // --- Funções de Renderização (desenhar na tela) ---
+    // --- Funções de Renderização ---
     const render = {
         all: () => {
             render.calculator();
             render.lists();
+            render.reports();
             render.total();
             render.activeItemHighlight();
             render.calculatorDisplay();
@@ -243,6 +263,22 @@ document.addEventListener('DOMContentLoaded', () => {
             const priceInfo = item.status === 'comprado' ? `<div class="item-price-info">${item.quantidade} × R$ ${item.preco.toFixed(2)} = R$ ${(item.quantidade * item.preco).toFixed(2)}</div>` : '';
             li.innerHTML = `<span class="item-emoji">${item.emoji}</span><div class="item-details"><div class="item-name">${item.nome}</div>${priceInfo}</div><button class="delete-btn" data-id="${item.id}"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ff3b30" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>`;
             return li;
+        },
+        reports: () => {
+            const listEl = document.getElementById('lista-relatorios');
+            listEl.innerHTML = '';
+            if (state.reports.length === 0) {
+                listEl.innerHTML = `<p style="text-align:center; padding: 20px;">Nenhum relatório salvo.</p>`;
+                return;
+            }
+            state.reports.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).forEach(report => {
+                const li = document.createElement('li');
+                li.className = 'report-item';
+                li.dataset.id = report.id;
+                const reportDate = new Date(report.createdAt).toLocaleString('pt-BR');
+                li.innerHTML = `<div class="report-details"><div class="report-date">${reportDate}</div><div class="report-total">Total: R$ ${report.total.toFixed(2)}</div></div>`;
+                listEl.appendChild(li);
+            });
         },
         total: () => { const total = state.itens.filter(i => i.status === 'comprado').reduce((acc, item) => acc + (item.preco * item.quantidade), 0); ui.headerTotal.textContent = `R$ ${total.toFixed(2)}`; },
         activeItemHighlight: () => document.querySelectorAll('.item-row').forEach(row => row.classList.toggle('active', row.dataset.id == state.activeItemId)),
@@ -279,27 +315,37 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    // --- Interações do Usuário (Event Listeners) ---
+    // --- Interações do Usuário ---
     const interactions = {
         init: () => {
             listRef.on('value', (snapshot) => { const data = snapshot.val(); state.itens = data ? Object.keys(data).map(key => ({ ...data[key], id: key })) : []; render.all(); });
+            reportsRef.on('value', (snapshot) => { const data = snapshot.val(); state.reports = data ? Object.keys(data).map(key => ({ ...data[key], id: key })) : []; render.reports(); });
+            
             ui.form.addEventListener('submit', interactions.addItem);
             ui.keypad.addEventListener('click', e => { if (e.target.tagName === 'BUTTON') calculator.handleInput(e.target.textContent, e.target.dataset.action); });
             ui.tabs.addEventListener('click', e => { if (e.target.tagName === 'BUTTON') interactions.handleTabClick(e.target.dataset.tab); });
+            
+            document.getElementById('lista-relatorios').addEventListener('click', e => {
+                const reportRow = e.target.closest('.report-item');
+                if (reportRow) interactions.showReport(reportRow.dataset.id);
+            });
+
             ui.appContainer.addEventListener('click', e => {
                 const row = e.target.closest('.item-row'); if (!row) return;
                 const id = row.dataset.id;
                 const item = state.itens.find(i => i.id === id); if (!item) return;
                 if (e.target.closest('.delete-btn')) { interactions.deleteItem(id); } else { interactions.handleItemClick(id, item.status); }
             });
+            
             ui.btnFinalizar.addEventListener('click', interactions.openReportModal);
             ui.closeModalBtn.addEventListener('click', () => ui.reportModal.classList.remove('visible'));
+            ui.closeViewModalBtn.addEventListener('click', () => ui.reportViewModal.classList.remove('visible'));
             ui.downloadReportBtn.addEventListener('click', interactions.downloadReport);
             ui.printReportBtn.addEventListener('click', interactions.printReport);
             ui.finalizePurchaseBtn.addEventListener('click', interactions.finalizeAndReset);
             ui.toggleCalcBtn.addEventListener('click', interactions.toggleCalculator);
         },
-        addItem: (e) => { e.preventDefault(); const nome = ui.input.value.trim(); if (nome) { const newItemId = Date.now(); listRef.child(newItemId).set({ id: newItemId, nome: nome, emoji: getEmojiForItem(nome), status: 'faltando', quantidade: 1, preco: 0 }); ui.input.value = ''; } },
+        addItem: (e) => { e.preventDefault(); const nome = ui.input.value.trim(); if (nome) { const newItemId = Date.now(); listRef.child(newItemId).set({ id: newItemId, nome: nome, emoji: getEmojiForItem(nome), status: 'faltando', quantidade: 1, preco: 0 }); ui.input.value = ''; ui.input.focus(); } },
         deleteItem: (id) => { if (confirm('Tem certeza que deseja remover este item?')) { if (state.activeItemId === id) state.activeItemId = null; listRef.child(id).remove(); } },
         updateItem: (id, updates) => listRef.child(id).update(updates),
         handleItemClick: (id, status) => { if (status === 'faltando') interactions.selectItem(id); if (status === 'comprado') interactions.updateItem(id, { status: 'faltando', preco: 0 }); if (status === 'adiado') interactions.updateItem(id, { status: 'faltando' }); },
@@ -320,19 +366,16 @@ document.addEventListener('DOMContentLoaded', () => {
         },
         toggleCalculator: () => { state.ui.isCalculatorCollapsed = !state.ui.isCalculatorCollapsed; store.saveUI(); render.calculator(); },
         openReportModal: () => {
-            // BLOQUEIO: Verifica se ainda há itens na lista "A comprar"
             const faltando = state.itens.filter(i => i.status === 'faltando');
             if (faltando.length > 0) {
-                alert('Ainda há itens na lista "A comprar"! Finalize todos os itens antes de gerar o relatório.');
+                alert('Ainda há itens na lista "A comprar"! Mova-os para "Comprados" ou "Adiados" antes de finalizar.');
                 return;
             }
-
             const comprados = state.itens.filter(i => i.status === 'comprado'); 
             if (comprados.length === 0) { 
                 alert('Nenhum item foi comprado ainda.'); 
                 return; 
             }
-
             const total = comprados.reduce((acc, i) => acc + (i.preco * i.quantidade), 0);
             let reportText = `*** CUPOM FISCAL ***\n\nDATA: ${new Date().toLocaleString('pt-BR')}\n--------------------------------\nITEM      QTD    PREÇO    TOTAL\n--------------------------------\n`;
             comprados.forEach(i => { reportText += `${i.nome.substring(0, 8).padEnd(8)} ${String(i.quantidade).padStart(4)} x ${i.preco.toFixed(2).padStart(8)} = ${(i.quantidade * i.preco).toFixed(2).padStart(8)}\n`; });
@@ -341,41 +384,43 @@ document.addEventListener('DOMContentLoaded', () => {
             ui.reportModal.classList.add('visible');
         },
         finalizeAndReset: () => {
-            // SALVAR RELATÓRIO: Pega os dados para salvar no Firebase
             const comprados = state.itens.filter(i => i.status === 'comprado');
             if (comprados.length === 0) return;
 
             const total = comprados.reduce((acc, i) => acc + (i.preco * i.quantidade), 0);
-            const reportText = ui.reportPaper.textContent;
-            
             const reportData = {
-                content: reportText,
+                content: ui.reportPaper.textContent,
                 total: total,
-                createdAt: firebase.database.ServerValue.TIMESTAMP
+                createdAt: new Date().toISOString()
             };
 
-            const reportsRef = database.ref('purchase_reports/' + listId);
-            reportsRef.push(reportData).then(() => {
-                // SÓ EXECUTA O RESTANTE DEPOIS DE SALVAR O RELATÓRIO
-                const adiados = state.itens.filter(i => i.status === 'adiado');
-                listRef.set(null).then(() => {
-                    if (adiados.length > 0) {
-                        const newItems = {};
-                        adiados.forEach(item => { 
-                            const { id, ...data } = item; 
-                            newItems[id] = { ...data, status: 'faltando' }; 
-                        });
-                        listRef.set(newItems);
-                    }
-                });
-
-                ui.reportModal.classList.remove('visible');
-                interactions.switchTab('faltando');
-
-            }).catch(error => {
+            reportsRef.push(reportData).catch(error => {
                 console.error("Erro ao salvar o relatório no Firebase:", error);
                 alert("Não foi possível salvar o relatório. Verifique sua conexão e tente novamente.");
             });
+
+            const adiados = state.itens.filter(i => i.status === 'adiado');
+            listRef.set(null).then(() => {
+                if (adiados.length > 0) {
+                    const newItems = {};
+                    adiados.forEach(item => { 
+                        const newItemId = Date.now() + Math.random(); // Garante ID único
+                        const { id, ...data } = item; 
+                        newItems[newItemId] = { ...data, status: 'faltando' }; 
+                    });
+                    listRef.set(newItems);
+                }
+            });
+
+            ui.reportModal.classList.remove('visible');
+            interactions.switchTab('faltando');
+        },
+        showReport: (reportId) => {
+            const report = state.reports.find(r => r.id === reportId);
+            if(report) {
+                ui.reportViewContent.textContent = report.content;
+                ui.reportViewModal.classList.add('visible');
+            }
         },
         downloadReport: () => { const blob = new Blob([ui.reportPaper.textContent], {type: 'text/plain'}); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'relatorio_compras.txt'; a.click(); },
         printReport: () => { const win = window.open('', '_blank'); win.document.write(`<html><head><title>Relatório de Compra</title></head><body><pre>${ui.reportPaper.textContent}</pre></body></html>`); win.document.close(); win.print(); }
@@ -384,32 +429,28 @@ document.addEventListener('DOMContentLoaded', () => {
     interactions.init();
 });
 
-// --- Lógica do PWA (instalação e service worker) ---
+// --- Lógica do PWA ---
 let deferredPrompt;
 window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     deferredPrompt = e;
-    const installBanner = document.getElementById('install-banner');
-    if (installBanner) installBanner.style.display = 'flex';
+    document.getElementById('install-banner').style.display = 'flex';
 });
 
 document.addEventListener('click', async (e) => {
     if (e.target && e.target.id === 'install-btn') {
-        const installBanner = document.getElementById('install-banner');
-        if(installBanner) installBanner.style.display = 'none';
+        document.getElementById('install-banner').style.display = 'none';
         deferredPrompt.prompt();
         await deferredPrompt.userChoice;
         deferredPrompt = null;
     }
     if (e.target && e.target.id === 'dismiss-btn') {
-        const installBanner = document.getElementById('install-banner');
-        if(installBanner) installBanner.style.display = 'none';
+        document.getElementById('install-banner').style.display = 'none';
     }
 });
 
 window.addEventListener('appinstalled', () => {
-    const installBanner = document.getElementById('install-banner');
-    if(installBanner) installBanner.style.display = 'none';
+    document.getElementById('install-banner').style.display = 'none';
     deferredPrompt = null;
 });
 
