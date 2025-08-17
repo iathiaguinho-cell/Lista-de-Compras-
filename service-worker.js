@@ -1,6 +1,6 @@
 // Define um nome e uma versão para o cache do aplicativo.
 // Mudar a versão (ex: v2, v3) força o service worker a reinstalar e buscar novos arquivos.
-const CACHE_NAME = 'compras-da-helena-cache-v3';
+const CACHE_NAME = 'minhas-compras-cache-v3';
 
 // Lista de arquivos essenciais para o funcionamento offline do app.
 const urlsToCache = [
