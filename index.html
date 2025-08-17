@@ -58,8 +58,9 @@
         .item-emoji{font-size:1.5rem;margin-right:10px;user-select:none}
         .item-details, .report-details{display:flex;flex-direction:column;flex-grow:1;pointer-events:none}
         .item-name, .report-date{font-size:1.2rem;font-weight:500}
+        .report-location{font-size: 1rem; color: var(--cor-texto-principal); font-weight: 500;}
         .item-price-info, .report-total{font-size:0.9rem;color:var(--cor-texto-secundario)}
-        .delete-btn{background:none;border:none;cursor:pointer;padding:5px;margin-left:10px}
+        .delete-btn, .delete-report-btn{background:none;border:none;cursor:pointer;padding:5px;margin-left:10px; flex-shrink: 0;}
         .calculator-footer{flex-shrink:0;background-color:#212529;padding:0 15px 15px 15px;border-top:2px solid #495057;position:relative}
         #toggle-calc-btn{position:absolute;top:-25px;left:50%;transform:translateX(-50%);width:50px;height:25px;background-color:#212529;border:2px solid #495057;border-bottom:none;border-radius:10px 10px 0 0;color:#adb5bd;cursor:pointer}
         #toggle-calc-btn svg{transition:transform 0.4s ease}
@@ -146,6 +147,10 @@
     <!-- Modal para finalizar compra -->
     <div id="report-modal" class="modal-overlay">
         <div class="modal-content">
+            <div style="margin-bottom: 15px;">
+                <label for="purchase-location" style="display: block; margin-bottom: 5px; font-size: 0.9rem; color: var(--cor-texto-secundario);">Local da Compra:</label>
+                <input type="text" id="purchase-location" placeholder="Ex: Supermercado Central" style="width: 100%; box-sizing: border-box; padding: 10px; border-radius: 8px; border: 1px solid var(--cor-borda); font-size: 1rem;">
+            </div>
             <div id="report-paper"></div>
             <div class="modal-actions" style="justify-content: space-between;">
                 <div><button id="download-report-btn">Baixar</button><button id="print-report-btn">Imprimir</button></div>
@@ -223,6 +228,7 @@ document.addEventListener('DOMContentLoaded', () => {
         btnFinalizar: document.getElementById('btn-finalizar'),
         reportModal: document.getElementById('report-modal'),
         reportPaper: document.getElementById('report-paper'),
+        purchaseLocationInput: document.getElementById('purchase-location'),
         closeModalBtn: document.getElementById('close-modal-btn'),
         printReportBtn: document.getElementById('print-report-btn'),
         downloadReportBtn: document.getElementById('download-report-btn'),
@@ -283,7 +289,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 li.className = 'report-item';
                 li.dataset.id = report.id;
                 const reportDate = new Date(report.createdAt).toLocaleString('pt-BR');
-                li.innerHTML = `<div class="report-details"><div class="report-date">${reportDate}</div><div class="report-total">Total: R$ ${report.total.toFixed(2)}</div></div>`;
+                const location = report.location ? report.location : 'Local não informado';
+                li.innerHTML = `
+                    <div class="report-details" style="cursor:pointer;">
+                        <div class="report-location">${location}</div>
+                        <div class="report-date" style="font-size:0.9rem; font-weight: 400;">${reportDate}</div>
+                        <div class="report-total">Total: R$ ${report.total.toFixed(2)}</div>
+                    </div>
+                    <button class="delete-report-btn" data-id="${report.id}" title="Excluir Relatório">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ff3b30" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                    </button>
+                `;
                 listEl.appendChild(li);
             });
         },
@@ -333,8 +349,15 @@ document.addEventListener('DOMContentLoaded', () => {
             ui.tabs.addEventListener('click', e => { if (e.target.tagName === 'BUTTON') interactions.handleTabClick(e.target.dataset.tab); });
             
             document.getElementById('lista-relatorios').addEventListener('click', e => {
+                const deleteBtn = e.target.closest('.delete-report-btn');
+                if (deleteBtn) {
+                    interactions.deleteReport(deleteBtn.dataset.id);
+                    return;
+                }
                 const reportRow = e.target.closest('.report-item');
-                if (reportRow) interactions.showReport(reportRow.dataset.id);
+                if (reportRow) {
+                    interactions.showReport(reportRow.dataset.id);
+                }
             });
 
             ui.appContainer.addEventListener('click', e => {
@@ -354,6 +377,12 @@ document.addEventListener('DOMContentLoaded', () => {
         },
         addItem: (e) => { e.preventDefault(); const nome = ui.input.value.trim(); if (nome) { const newItemId = Date.now(); listRef.child(newItemId).set({ id: newItemId, nome: nome, emoji: getEmojiForItem(nome), status: 'faltando', quantidade: 1, preco: 0 }); ui.input.value = ''; ui.input.focus(); } },
         deleteItem: (id) => { if (confirm('Tem certeza que deseja remover este item?')) { if (state.activeItemId === id) state.activeItemId = null; listRef.child(id).remove(); } },
+        deleteReport: (reportId) => {
+            if (confirm('Tem certeza que deseja excluir este relatório? Esta ação não pode ser desfeita.')) {
+                reportsRef.child(reportId).remove()
+                    .catch(err => alert('Erro ao excluir relatório.'));
+            }
+        },
         updateItem: (id, updates) => listRef.child(id).update(updates),
         handleItemClick: (id, status) => { if (status === 'faltando') interactions.selectItem(id); if (status === 'comprado') interactions.updateItem(id, { status: 'faltando', preco: 0, quantidade: 1 }); if (status === 'adiado') interactions.updateItem(id, { status: 'faltando' }); },
         selectItem: (id) => { state.activeItemId = (state.activeItemId === id) ? null : id; state.calcDisplay = '0'; render.all(); },
@@ -388,6 +417,7 @@ document.addEventListener('DOMContentLoaded', () => {
             comprados.forEach(i => { reportText += `${i.nome.substring(0, 8).padEnd(8)} ${String(i.quantidade).padStart(4)} x ${i.preco.toFixed(2).padStart(8)} = ${(i.quantidade * i.preco).toFixed(2).padStart(8)}\n`; });
             reportText += `--------------------------------\nTOTAL A PAGAR: R$ ${total.toFixed(2)}\n\n***** VOLTE SEMPRE *****`;
             ui.reportPaper.textContent = reportText;
+            ui.purchaseLocationInput.value = ''; // Limpa o campo ao abrir
             ui.reportModal.classList.add('visible');
         },
         finalizeAndReset: () => {
@@ -397,9 +427,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
+            const location = ui.purchaseLocationInput.value.trim();
             const total = comprados.reduce((acc, i) => acc + (i.preco * i.quantidade), 0);
+            
+            // Gera o texto final do relatório, agora com o local
+            let reportText = `*** CUPOM FISCAL ***\n\nLOCAL: ${location || 'Não informado'}\nDATA: ${new Date().toLocaleString('pt-BR')}\n--------------------------------\nITEM      QTD    PREÇO    TOTAL\n--------------------------------\n`;
+            comprados.forEach(i => { reportText += `${i.nome.substring(0, 8).padEnd(8)} ${String(i.quantidade).padStart(4)} x ${i.preco.toFixed(2).padStart(8)} = ${(i.quantidade * i.preco).toFixed(2).padStart(8)}\n`; });
+            reportText += `--------------------------------\nTOTAL A PAGAR: R$ ${total.toFixed(2)}\n\n***** VOLTE SEMPRE *****`;
+
             const reportData = {
-                content: ui.reportPaper.textContent,
+                content: reportText,
+                location: location || 'Não informado',
                 total: total,
                 createdAt: new Date().toISOString()
             };
@@ -434,8 +472,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 ui.reportViewModal.classList.add('visible');
             }
         },
-        downloadReport: () => { const blob = new Blob([ui.reportPaper.textContent], {type: 'text/plain'}); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'relatorio_compras.txt'; a.click(); },
-        printReport: () => { const win = window.open('', '_blank'); win.document.write(`<html><head><title>Relatório de Compra</title></head><body><pre>${ui.reportPaper.textContent}</pre></body></html>`); win.document.close(); win.print(); }
+        downloadReport: () => { 
+            const location = ui.purchaseLocationInput.value.trim();
+            const currentReportText = ui.reportPaper.textContent;
+            const updatedReportText = currentReportText.replace('*** CUPOM FISCAL ***', `*** CUPOM FISCAL ***\n\nLOCAL: ${location || 'Não informado'}`);
+            const blob = new Blob([updatedReportText], {type: 'text/plain'}); 
+            const a = document.createElement('a'); 
+            a.href = URL.createObjectURL(blob); 
+            a.download = 'relatorio_compras.txt'; 
+            a.click(); 
+        },
+        printReport: () => { 
+            const location = ui.purchaseLocationInput.value.trim();
+            const currentReportText = ui.reportPaper.textContent;
+            const updatedReportText = currentReportText.replace('*** CUPOM FISCAL ***', `*** CUPOM FISCAL ***\n\nLOCAL: ${location || 'Não informado'}`);
+            const win = window.open('', '_blank'); 
+            win.document.write(`<html><head><title>Relatório de Compra</title></head><body><pre>${updatedReportText}</pre></body></html>`); 
+            win.document.close(); 
+            win.print(); 
+        }
     };
 
     interactions.init();
@@ -501,4 +556,3 @@ window.addEventListener('appinstalled', () => {
 </script>
 </body>
 </html>
-
