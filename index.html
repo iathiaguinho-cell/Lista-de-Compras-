@@ -415,7 +415,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const total = comprados.reduce((acc, i) => acc + (i.preco * i.quantidade), 0);
             let reportText = `*** CUPOM FISCAL ***\n\nDATA: ${new Date().toLocaleString('pt-BR')}\n--------------------------------\nITEM      QTD    PREÇO    TOTAL\n--------------------------------\n`;
             comprados.forEach(i => { reportText += `${i.nome.substring(0, 8).padEnd(8)} ${String(i.quantidade).padStart(4)} x ${i.preco.toFixed(2).padStart(8)} = ${(i.quantidade * i.preco).toFixed(2).padStart(8)}\n`; });
-            reportText += `--------------------------------\nTOTAL A PAGAR: R$ ${total.toFixed(2)}\n\n***** VOLTE SEMPRE *****`;
+            reportText += `--------------------------------\nTOTAL A PAGAR: R$ ${total.toFixed(2)}\n\n***** thIAguinho Soluções *****`;
             ui.reportPaper.textContent = reportText;
             ui.purchaseLocationInput.value = ''; // Limpa o campo ao abrir
             ui.reportModal.classList.add('visible');
@@ -433,7 +433,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Gera o texto final do relatório, agora com o local
             let reportText = `*** CUPOM FISCAL ***\n\nLOCAL: ${location || 'Não informado'}\nDATA: ${new Date().toLocaleString('pt-BR')}\n--------------------------------\nITEM      QTD    PREÇO    TOTAL\n--------------------------------\n`;
             comprados.forEach(i => { reportText += `${i.nome.substring(0, 8).padEnd(8)} ${String(i.quantidade).padStart(4)} x ${i.preco.toFixed(2).padStart(8)} = ${(i.quantidade * i.preco).toFixed(2).padStart(8)}\n`; });
-            reportText += `--------------------------------\nTOTAL A PAGAR: R$ ${total.toFixed(2)}\n\n***** VOLTE SEMPRE *****`;
+            reportText += `--------------------------------\nTOTAL A PAGAR: R$ ${total.toFixed(2)}\n\n***** thIAguinho Soluções *****`;
 
             const reportData = {
                 content: reportText,
